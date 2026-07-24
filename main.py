@@ -33,7 +33,7 @@ def main():
         
     print("Processing Document Images...")
     try:
-        image_processor = ImageProcessor()
+        image_processor = ImageProcessor(analyzer.analyzer)
         image_processor.process_images_in_docx(args.output_file)
     except Exception as e:
         print(f"Error processing document images: {e}")

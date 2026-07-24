@@ -25,6 +25,9 @@ class FakeDataAnonymizer:
             elif entity_type == "PHONE_NUMBER":
                 return self.fake.phone_number()
             elif entity_type == "LOCATION":
+                # city() is intentionally used here: Presidio's LOCATION spans are
+                # typically single city/region names. Replacing with a full address
+                # would break the surrounding sentence structure.
                 return self.fake.city()
             elif entity_type == "ORGANIZATION":
                 return self.fake.company()

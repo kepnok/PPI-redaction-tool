@@ -7,4 +7,4 @@ PyYAML
 spacy
 pytesseract
 pillow
-opencv-python-headless
+opencv-python-headless<5

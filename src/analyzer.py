@@ -51,39 +51,61 @@ class RedactionAnalyzer:
             score_threshold=0.5
         )
         
-        # Filter out results that are in the allow_list (exact match or substring)
+        # Pre-compute lowercase allow_list for case-insensitive exact matching
+        allow_list_lower = set(w.lower() for w in self.allow_list)
+
+        import re
+        
+        # Filter out results based on token intersection
         filtered_results = []
         for res in results:
             matched_text = text[res.start:res.end]
+            clean_match = matched_text.lower()
             
-            if matched_text.strip() in self.allow_list:
+            # If the entity contains ANY allowlisted word (as a distinct word boundary), discard it.
+            # This elegantly catches "Cap Price", "Floor Price" just because "Price" is in the allowlist.
+            should_allow = False
+            for allowed in self.allow_list:
+                if re.search(r'\b' + re.escape(allowed.lower()) + r'\b', clean_match):
+                    should_allow = True
+                    break
+                    
+            if should_allow:
                 continue
                 
             # Hide the bank addresses (LOCATION) but leave the bank name (ORGANIZATION)
-            if res.entity_type == "ORGANIZATION" and "bank" in matched_text.lower():
+            if res.entity_type == "ORGANIZATION" and re.search(r'\bbank\b', clean_match):
                 continue
                 
             filtered_results.append(res)
                 
-        # To handle the requirement "figures related to orders/costs/revenue are allowlisted",
-        # if Presidio mistakenly flags a cost or revenue number as a phone number or something else,
-        # we can check if the context window around the match contains our allow_list keywords.
+        # Core PII entity types that must ALWAYS be redacted,
+        # regardless of any surrounding context words.
+        ALWAYS_REDACT = {
+            "PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER",
+            "US_SSN", "CREDIT_CARD", "IP_ADDRESS",
+            "IN_PAN", "IN_AADHAR", "IN_SEBI", "IN_CIN",
+            "ORGANIZATION",
+        }
+
+        # Context window check: only applies to DATE_TIME and LOCATION.
         final_results = []
         for res in filtered_results:
+            if res.entity_type in ALWAYS_REDACT:
+                final_results.append(res)
+                continue
+
             start_context = max(0, res.start - 30)
             end_context = min(len(text), res.end + 30)
             context_window = text[start_context:end_context].lower()
-            
-            # Check if any allow_list keyword is in the context window around the entity
+
             should_allow = False
-            for allowed_word in self.allow_list:
-                if allowed_word.lower() in context_window:
-                    # If it's a date or person, maybe we still redact, but for numbers we allowlist.
-                    # Since requirements state allowlisting these figures, we skip redaction.
+            for allowed in self.allow_list:
+                if re.search(r'\b' + re.escape(allowed.lower()) + r'\b', context_window):
                     should_allow = True
                     break
-            
+
             if not should_allow:
                 final_results.append(res)
-                
+
         return final_results

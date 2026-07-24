@@ -1,7 +1,8 @@
 import docx
 from docx.text.paragraph import Paragraph
+from docx.oxml.ns import qn
 
-from typing import List, Dict, Tuple, Any
+from typing import List, Any, Iterator
 from .analyzer import RedactionAnalyzer
 from .anonymizer import FakeDataAnonymizer
 
@@ -12,24 +13,25 @@ class DocxProcessor:
         self.analyzer = analyzer
         self.anonymizer = anonymizer
 
+    def _iter_all_paragraphs(self, doc: docx.Document) -> Iterator[Paragraph]:
+        """
+        Yield every paragraph in document order, including those inside tables
+        and nested tables. python-docx's doc.paragraphs misses table-cell paragraphs;
+        doc.tables misses nested tables. This walks the raw XML body to get everything.
+        """
+        body = doc.element.body
+        for child in body.iter():
+            if child.tag == qn('w:p'):
+                yield Paragraph(child, doc)
+
     def process_document(self, input_path: str, output_path: str):
         """Main method to process the entire document."""
         doc = docx.Document(input_path)
-        
-        # Process paragraphs in the body
-        for para in doc.paragraphs:
+
+        # Walk every paragraph in document order (body + all table cells, including nested)
+        for para in self._iter_all_paragraphs(doc):
             self._process_paragraph(para)
-            
-        # Process tables
-        for table in doc.tables:
-            for row in table.rows:
-                for cell in row.cells:
-                    for para in cell.paragraphs:
-                        self._process_paragraph(para)
-                        
-        # TODO: Handle images (using image_processor.py)
-        # We will add image processing integration later or in main.py
-        
+
         doc.save(output_path)
 
     def _process_paragraph(self, paragraph: Paragraph):
@@ -43,8 +45,23 @@ class DocxProcessor:
         if not results:
             return
             
-        # Sort results in reverse order so replacements don't mess up indices
-        results = sorted(results, key=lambda x: x.start, reverse=True)
+        # Sort results by score desc, then span length desc so the best match wins
+        # when spans overlap.
+        results = sorted(results, key=lambda x: (x.score, x.end - x.start), reverse=True)
+
+        # Deduplicate: remove any result whose span overlaps with a higher-priority
+        # result already kept. This prevents double-replacement corruption when
+        # Presidio returns both PERSON "ksh" and EMAIL "ksh@domain.com" at the same offset.
+        deduped = []
+        for res in results:
+            if not any(
+                res.start < kept.end and res.end > kept.start
+                for kept in deduped
+            ):
+                deduped.append(res)
+
+        # Now sort in reverse start order for safe in-place replacement
+        results = sorted(deduped, key=lambda x: x.start, reverse=True)
         
         # We need a robust way to replace text that might span multiple runs.
         # But for simplicity and safety, let's build a map of character indices to runs.
