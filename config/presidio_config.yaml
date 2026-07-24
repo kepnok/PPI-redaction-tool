@@ -1,0 +1,71 @@
+analyzer:
+  default_entities:
+    - PERSON
+    - EMAIL_ADDRESS
+    - PHONE_NUMBER
+    - LOCATION
+    - ORGANIZATION
+    - US_SSN
+    - CREDIT_CARD
+    - DATE_TIME
+    - IP_ADDRESS
+
+  custom_recognizers:
+    - name: "Indian PAN Card"
+      supported_entity: "IN_PAN"
+      patterns:
+        - name: "pan_regex"
+          pattern: "\\b[A-Z]{5}[0-9]{4}[A-Z]{1}\\b"
+          score: 0.8
+      context:
+        - "pan"
+        - "pan number"
+
+    - name: "Indian Aadhar Card"
+      supported_entity: "IN_AADHAR"
+      patterns:
+        - name: "aadhar_regex"
+          pattern: "\\b[2-9]{1}[0-9]{3}\\s?[0-9]{4}\\s?[0-9]{4}\\b"
+          score: 0.8
+      context:
+        - "aadhar"
+        - "aadhaar"
+        - "uid"
+
+    - name: "SEBI Registration Number"
+      supported_entity: "IN_SEBI"
+      patterns:
+        - name: "sebi_regex"
+          pattern: "\\bIN[A-Z0-9]{10}\\b"
+          score: 0.4
+      context:
+        - "sebi"
+        - "registration"
+        - "regn"
+        - "sebi registration number"
+
+    - name: "CIN Number"
+      supported_entity: "IN_CIN"
+      patterns:
+        - name: "cin_regex"
+          pattern: "\\b[LU][0-9]{5}[A-Z]{2}[0-9]{4}[A-Z]{3}[0-9]{6}\\b"
+          score: 0.8
+      context:
+        - "cin"
+        - "corporate identification number"
+
+  allow_list:
+    # Terms that we don't want to redact even if they trigger some number/figure match
+    - "Order"
+    - "Cost"
+    - "Revenue"
+    - "Ticket"
+    - "costs"
+    - "orders"
+    - "revenues"
+    - "tickets"
+
+anonymizer:
+  # This section defines how faker mapping works, mapped in python code directly based on entity type.
+  # But we can store general settings here if needed.
+  faker_seed: 42

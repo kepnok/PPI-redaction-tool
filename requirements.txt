@@ -1,0 +1,10 @@
+presidio-analyzer
+presidio-anonymizer
+presidio-image-redactor
+python-docx
+Faker
+PyYAML
+spacy
+pytesseract
+pillow
+opencv-python-headless
