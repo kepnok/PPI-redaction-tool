@@ -72,16 +72,12 @@ class ImageProcessor:
                     
                     if item.filename.startswith("word/media/") and item.filename.lower().endswith(('.png', '.jpg', '.jpeg')):
                         try:
-                            # 1. Load image
                             img = Image.open(io.BytesIO(data))
                             
-                            # 2. Redact faces using OpenCV
                             img = self.redact_faces(img)
                             
-                            # 3. Redact PII text using Presidio (which now has our custom IN_PAN / IN_AADHAR rules)
                             redacted_img = self.engine.redact(img, (0, 0, 0))
                             
-                            # 4. Save back to bytes
                             img_byte_arr = io.BytesIO()
                             format = 'PNG' if item.filename.lower().endswith('.png') else 'JPEG'
                             redacted_img.save(img_byte_arr, format=format)

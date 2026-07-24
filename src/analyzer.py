@@ -41,29 +41,22 @@ class RedactionAnalyzer:
             rec["supported_entity"] for rec in self.config.get("custom_recognizers", [])
         ]
         
-        # We pass allow_list if there are specific strings to never redact
-        # presidio-analyzer doesn't have an built-in allowlist parameter for contextual exclusion,
-        # but we can filter results after the fact if they match our allow_list.
         results = self.analyzer.analyze(
             text=text,
             entities=entities,
             language='en',
             score_threshold=0.5
         )
-        
-        # Pre-compute lowercase allow_list for case-insensitive exact matching
+
         allow_list_lower = set(w.lower() for w in self.allow_list)
 
         import re
         
-        # Filter out results based on token intersection
         filtered_results = []
         for res in results:
             matched_text = text[res.start:res.end]
             clean_match = matched_text.lower()
             
-            # If the entity contains ANY allowlisted word (as a distinct word boundary), discard it.
-            # This elegantly catches "Cap Price", "Floor Price" just because "Price" is in the allowlist.
             should_allow = False
             for allowed in self.allow_list:
                 if re.search(r'\b' + re.escape(allowed.lower()) + r'\b', clean_match):
@@ -73,14 +66,11 @@ class RedactionAnalyzer:
             if should_allow:
                 continue
                 
-            # Hide the bank addresses (LOCATION) but leave the bank name (ORGANIZATION)
             if res.entity_type == "ORGANIZATION" and re.search(r'\bbank\b', clean_match):
                 continue
                 
             filtered_results.append(res)
-                
-        # Core PII entity types that must ALWAYS be redacted,
-        # regardless of any surrounding context words.
+       
         ALWAYS_REDACT = {
             "PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER",
             "US_SSN", "CREDIT_CARD", "IP_ADDRESS",
@@ -88,7 +78,6 @@ class RedactionAnalyzer:
             "ORGANIZATION",
         }
 
-        # Context window check: only applies to DATE_TIME and LOCATION.
         final_results = []
         for res in filtered_results:
             if res.entity_type in ALWAYS_REDACT:

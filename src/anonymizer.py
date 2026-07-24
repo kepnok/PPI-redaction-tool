@@ -8,7 +8,6 @@ class FakeDataAnonymizer:
         self.config = config
         seed = self.config.get("faker_seed", 42)
         Faker.seed(seed)
-        # We can use the Indian locale for Faker to generate realistic Indian names, addresses, PAN, Aadhar if possible
         self.fake = Faker(['en_IN', 'en_US'])
         self.mapping = {}
         
@@ -25,9 +24,6 @@ class FakeDataAnonymizer:
             elif entity_type == "PHONE_NUMBER":
                 return self.fake.phone_number()
             elif entity_type == "LOCATION":
-                # city() is intentionally used here: Presidio's LOCATION spans are
-                # typically single city/region names. Replacing with a full address
-                # would break the surrounding sentence structure.
                 return self.fake.city()
             elif entity_type == "ORGANIZATION":
                 return self.fake.company()
